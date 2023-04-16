@@ -1,31 +1,41 @@
-"Humza Qureshi"
 from PIL import Image
 from pytesseract import pytesseract
+from readreceipt import ConvertImage
+import sqlite3
 
-class READIN:
-    def __init__(self, filename):
-        self.filename = filename 
-        self.img = Image.open(self.filename)
-        self.text = pytesseract.image_to_string(self.img)
-        self.itemized_information = self.text.split()
-
-
-    def all_information(self):
-        print(self.text)
-
-    def print_all_info_into_a_list(self):
-        print(self.itemized_information)
+class ReadIn:
+    def __init__(self,filename):
+        self.receipt_text = ConvertImage(filename)
+        self.receipt = self.receipt_text.return_text()
+        self.itemized_information = self.receipt.split()
+        self.total = 0
+        self.conn = sqlite3.connect("receipts.db")
+        self.c = self.conn.cursor()
+        self.c.execute("CREATE TABLE IF NOT EXISTS receipts (amount real)")
 
     def findtotal(self):
-        count = 0
-        for word in self.itemized_information:
-            if word.lower() == "the":
-                count = count + 1
+        
+        index = self.itemized_information.index("TOTAL")
+        try:
+            self.total = float(self.itemized_information[index + 1])
+        except ValueError:
+            self.itemized_information.pop(index)
+            self.findtotal()
 
-        return count
+    def add_to_db(self):
+        total = self.total
+        self.c.execute("INSERT INTO receipts VALUES (?)", (total,))
+        self.conn.commit()
+    def print_db(self):
+        self.c.execute("SELECT * FROM receipts")
+        items = self.c.fetchall()
+        for ele in items:
+            print(ele[0])
 
-demo = READIN("testpic.png")
-print(demo.findtotal())
+    def run(self):
+        self.findtotal()
+        self.add_to_db()
+        self.print_db()
 
 
 
